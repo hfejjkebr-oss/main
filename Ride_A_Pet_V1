@@ -1,0 +1,3 @@
+-- Thai
+getgenv().SCRIPT_KEY = "KEYLESS"
+loadstring(game:HttpGet("https://api.jnkie.com/api/v1/luascripts/public/0d3f070c72e86ac5e4ff2204418253f5d161abb58514cadb9c8a408dadc45427/download"))()
