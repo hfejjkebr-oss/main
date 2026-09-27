@@ -1,4 +1,4 @@
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/MaruXLib/MaruX_LibraryV2.0.lua"))()
 
 Library:SetTheme({
 Accent     = Color3.fromRGB(0, 210, 210),
