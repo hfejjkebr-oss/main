@@ -4,7 +4,7 @@ A lightweight Roblox GUI Library for PC & Mobile.
 
 ## Preview
 
-![MaruX Library Preview](./images/demo.png)
+![MaruX Library Preview](./IMG_20260927_152354_533.jpg)
 
 ## How to Use
 
