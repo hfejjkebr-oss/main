@@ -532,8 +532,7 @@ end)
 
 # Library URL
 
-https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua
-
+https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/MaruXLib/MaruX_LibraryV2.0.lua
 ---
 
 # Credits
