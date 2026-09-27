@@ -1,5 +1,3 @@
-ได้ครับ กดคัดลอกที่ กล่องเดียวด้านล่างนี้ ได้เลย 👇
-
 # MaruX Library V2.0
 
 A lightweight and customizable Roblox GUI Library for PC & Mobile.
@@ -15,40 +13,47 @@ A lightweight and customizable Roblox GUI Library for PC & Mobile.
 ### Load Library
 
 ```lua
-local Library = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua"
-))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua"))()
+```
 
-Set Theme
+### Set Theme
 
+```lua
 Library:SetTheme({
-    Accent     = Color3.fromRGB(0, 210, 210),
+    Accent = Color3.fromRGB(0, 210, 210),
     Background = Color3.fromRGB(12, 17, 22),
 })
+```
 
-Create Window
+### Create Window
 
+```lua
 local Window = Library:CreateWindow({
-    Title   = "Maru x Hub",
+    Title = "Maru x Hub",
     Version = "Version: 268",
-    Logo    = "rbxassetid://125484418530410",
+    Logo = "rbxassetid://125484418530410",
 })
+```
 
-Create Tab
+### Create Tab
 
+```lua
 local MainTab = Window:AddTab("Main")
-
+```
 
 ---
 
-Components
+# Components
 
-Section
+## Section
 
+```lua
 MainTab:AddSection("Teleport")
+```
 
-Toggle
+## Toggle
 
+```lua
 MainTab:AddToggle({
     Name = "Start / Stop",
     Default = false,
@@ -56,18 +61,22 @@ MainTab:AddToggle({
         print("State:", state)
     end,
 })
+```
 
-Button
+## Button
 
+```lua
 MainTab:AddButton({
     Name = "Test Button",
     Callback = function()
         print("Button clicked!")
     end,
 })
+```
 
-Slider
+## Slider
 
+```lua
 MainTab:AddSlider({
     Name = "Walk Speed",
     Min = 16,
@@ -77,9 +86,11 @@ MainTab:AddSlider({
         print("Value:", value)
     end,
 })
+```
 
-Dropdown
+## Dropdown
 
+```lua
 local dropdown = MainTab:AddDropdown({
     Name = "Select Player",
     Options = {
@@ -92,22 +103,28 @@ local dropdown = MainTab:AddDropdown({
         print("Selected:", value)
     end,
 })
+```
 
-Refresh Dropdown
+## Refresh Dropdown
 
+```lua
 dropdown:Refresh({
     "Player 1",
     "Player 2",
     "Player 3"
 })
+```
 
-Get Dropdown Value
+## Get Dropdown Value
 
+```lua
 local selected = dropdown:Get()
 print(selected)
+```
 
-Keybind
+## Keybind
 
+```lua
 MainTab:AddKeybind({
     Name = "Aimbot Key",
     Default = Enum.KeyCode.Q,
@@ -115,9 +132,11 @@ MainTab:AddKeybind({
         print("Key pressed!")
     end,
 })
+```
 
-Color Picker
+## Color Picker
 
+```lua
 MainTab:AddColorPicker({
     Name = "ESP Color",
     Default = Color3.fromRGB(0, 210, 210),
@@ -125,9 +144,11 @@ MainTab:AddColorPicker({
         print("Color:", color)
     end,
 })
+```
 
-Textbox
+## Textbox
 
+```lua
 MainTab:AddTextbox({
     Name = "Server Note",
     Placeholder = "Enter text...",
@@ -137,52 +158,59 @@ MainTab:AddTextbox({
         print("Text:", text)
     end,
 })
+```
 
-Label
+## Label
 
+```lua
 MainTab:AddLabel(
     "MaruX Library V2.0",
     Color3.fromRGB(0, 210, 210)
 )
+```
 
-Separator
+## Separator
 
+```lua
 MainTab:AddSeparator()
+```
 
-Notification
+## Notification
 
+```lua
 Library:Notify({
     Title = "MaruX",
     Message = "Library loaded!",
     Type = "success",
     Duration = 4,
 })
+```
 
-Mobile Toggle
+## Mobile Toggle
 
+```lua
 Library:AddMobileToggle(
     Window,
     "rbxassetid://125484418530410"
 )
-
+```
 
 ---
 
-Complete Example
+# Complete Example
 
-local Library = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua"
-))()
+```lua
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua"))()
 
 Library:SetTheme({
-    Accent     = Color3.fromRGB(0, 210, 210),
+    Accent = Color3.fromRGB(0, 210, 210),
     Background = Color3.fromRGB(12, 17, 22),
 })
 
 local Window = Library:CreateWindow({
-    Title   = "Maru x Hub",
+    Title = "Maru x Hub",
     Version = "Version: 268",
-    Logo    = "rbxassetid://125484418530410",
+    Logo = "rbxassetid://125484418530410",
 })
 
 local MainTab = Window:AddTab("Main")
@@ -466,74 +494,52 @@ task.delay(0.5, function()
         Duration = 4,
     })
 end)
-
-
----
-
-Features
-
-PC Support
-
-Mobile Support
-
-Draggable Window
-
-Mobile Toggle Button
-
-Custom Theme
-
-Tabs
-
-Sections
-
-Toggle
-
-Button
-
-Slider
-
-Dropdown
-
-Keybind
-
-Color Picker
-
-Textbox
-
-Label
-
-Separator
-
-Notifications
-
-Dropdown Refresh
-
-Dropdown Get Value
-
-
+```
 
 ---
 
-Files
+# Features
 
-Example.lua
-
-MaruX_LibraryV2.0.lua
-
+- PC Support
+- Mobile Support
+- Draggable Window
+- Mobile Toggle Button
+- Custom Theme
+- Tabs
+- Sections
+- Toggle
+- Button
+- Slider
+- Dropdown
+- Keybind
+- Color Picker
+- Textbox
+- Label
+- Separator
+- Notifications
+- Dropdown Refresh
+- Dropdown Get Value
 
 ---
 
-Library URL
+# Files
+
+[Example.lua](./Example.lua)
+
+[MaruX_LibraryV2.0.lua](./MaruX_LibraryV2.0.lua)
+
+---
+
+# Library URL
 
 https://raw.githubusercontent.com/hfejjkebr-oss/main/refs/heads/main/MaruX_LibraryV2.0.lua
 
-
 ---
 
-Credits
+# Credits
 
-MaruX Hub
+**MaruX Hub**
 
-MaruX Library V2.0
+**MaruX Library V2.0**
 
 Made for Roblox GUI development and testing.
