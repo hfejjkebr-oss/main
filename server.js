@@ -2,12 +2,7 @@ const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
-
 app.use(express.json({ limit: "1mb" }));
-
-// ================================
-// CONFIG
-// ================================
 
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -17,16 +12,10 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 let supabase = null;
 
 if (SUPABASE_URL && SUPABASE_KEY) {
-    supabase = createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY
-    );
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// ================================
-// HOME - ACCESS DENIED
-// ================================
-
+// หน้าแรก
 app.get("/", (req, res) => {
     res.status(403).send(`
         <!DOCTYPE html>
@@ -34,25 +23,8 @@ app.get("/", (req, res) => {
         <head>
             <title>Zero Hub</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-                body {
-                    background: #0a0a0a;
-                    color: #ff3333;
-                    font-family: Arial, sans-serif;
-                    text-align: center;
-                    padding-top: 100px;
-                }
-
-                h1 {
-                    font-size: 42px;
-                }
-
-                h2 {
-                    font-size: 28px;
-                }
-            </style>
         </head>
-        <body>
+        <body style="background:#0a0a0a;color:#ff3333;text-align:center;font-family:Arial;padding-top:100px">
             <h1>Zero Hub</h1>
             <h2>Access Denied</h2>
         </body>
@@ -60,10 +32,7 @@ app.get("/", (req, res) => {
     `);
 });
 
-// ================================
-// API STATUS
-// ================================
-
+// ตรวจสอบสถานะ API
 app.get("/api/status", (req, res) => {
     res.json({
         success: true,
@@ -72,13 +41,10 @@ app.get("/api/status", (req, res) => {
     });
 });
 
-// ================================
-// DATABASE STATUS
-// ================================
-
+// ตรวจสอบการเชื่อมต่อฐานข้อมูล
 app.get("/api/db-status", async (req, res) => {
     if (!supabase) {
-        return res.status(500).json({
+        return res.status(503).json({
             success: false,
             database: "Not configured"
         });
@@ -95,27 +61,28 @@ app.get("/api/db-status", async (req, res) => {
 
             return res.status(500).json({
                 success: false,
-                database: "Error"
+                database: "Error",
+                message: error.message,
+                code: error.code
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             database: "Connected",
             table: "scripts"
         });
     } catch (error) {
-        res.status(500).json({
+        console.error("Database check exception:", error.message);
+
+        return res.status(500).json({
             success: false,
             database: "Error"
         });
     }
 });
 
-// ================================
-// BOT AUTHENTICATION
-// ================================
-
+// ตรวจสอบ Token ของ Discord Bot
 function authorizeBot(req, res, next) {
     if (!BOT_TOKEN) {
         return res.status(503).json({
@@ -134,16 +101,12 @@ function authorizeBot(req, res, next) {
     next();
 }
 
-// ================================
-// GET SCRIPT FOR LOADER
-// GET /api/script/:script_id
-// ================================
-
+// ดึงเนื้อหาสคริปต์ด้วย Script ID
 app.get("/api/script/:script_id", async (req, res) => {
     if (!supabase) {
-        return res.status(503).type("text/plain").send(
-            "-- Zero Hub API is not configured"
-        );
+        return res.status(503)
+            .type("text/plain")
+            .send("-- Zero Hub API is not configured");
     }
 
     try {
@@ -156,30 +119,28 @@ app.get("/api/script/:script_id", async (req, res) => {
         if (error) {
             console.error("Get script failed:", error.message);
 
-            return res.status(500).type("text/plain").send(
-                "-- Failed to retrieve script"
-            );
+            return res.status(500)
+                .type("text/plain")
+                .send("-- Failed to retrieve script");
         }
 
         if (!data) {
-            return res.status(404).type("text/plain").send(
-                "-- Script not found"
-            );
+            return res.status(404)
+                .type("text/plain")
+                .send("-- Script not found");
         }
 
-        res.type("text/plain").send(data.content);
+        return res.type("text/plain").send(data.content);
     } catch (error) {
-        res.status(500).type("text/plain").send(
-            "-- Internal server error"
-        );
+        console.error("Get script exception:", error.message);
+
+        return res.status(500)
+            .type("text/plain")
+            .send("-- Internal server error");
     }
 });
 
-// ================================
-// ADD SCRIPT
-// POST /api/scripts
-// ================================
-
+// เพิ่มสคริปต์
 app.post("/api/scripts", authorizeBot, async (req, res) => {
     if (!supabase) {
         return res.status(503).json({
@@ -217,6 +178,8 @@ app.post("/api/scripts", authorizeBot, async (req, res) => {
             .single();
 
         if (error) {
+            console.error("Add script failed:", error.message);
+
             return res.status(400).json({
                 success: false,
                 error: error.code === "23505"
@@ -225,23 +188,21 @@ app.post("/api/scripts", authorizeBot, async (req, res) => {
             });
         }
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             script: data
         });
     } catch (error) {
-        res.status(500).json({
+        console.error("Add script exception:", error.message);
+
+        return res.status(500).json({
             success: false,
             error: "Internal server error"
         });
     }
 });
 
-// ================================
-// LIST SCRIPTS
-// GET /api/scripts
-// ================================
-
+// แสดงรายการสคริปต์
 app.get("/api/scripts", authorizeBot, async (req, res) => {
     if (!supabase) {
         return res.status(503).json({
@@ -257,29 +218,29 @@ app.get("/api/scripts", authorizeBot, async (req, res) => {
             .order("created_at", { ascending: false });
 
         if (error) {
+            console.error("List scripts failed:", error.message);
+
             return res.status(500).json({
                 success: false,
                 error: "Failed to list scripts"
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             scripts: data
         });
     } catch (error) {
-        res.status(500).json({
+        console.error("List scripts exception:", error.message);
+
+        return res.status(500).json({
             success: false,
             error: "Internal server error"
         });
     }
 });
 
-// ================================
-// UPDATE SCRIPT
-// PUT /api/scripts/:script_id
-// ================================
-
+// แก้ไขสคริปต์
 app.put("/api/scripts/:script_id", authorizeBot, async (req, res) => {
     if (!supabase) {
         return res.status(503).json({
@@ -314,6 +275,8 @@ app.put("/api/scripts/:script_id", authorizeBot, async (req, res) => {
             .maybeSingle();
 
         if (findError) {
+            console.error("Find script failed:", findError.message);
+
             return res.status(500).json({
                 success: false,
                 error: "Failed to find script"
@@ -341,29 +304,29 @@ app.put("/api/scripts/:script_id", authorizeBot, async (req, res) => {
             .single();
 
         if (error) {
+            console.error("Update script failed:", error.message);
+
             return res.status(500).json({
                 success: false,
                 error: "Failed to update script"
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             script: data
         });
     } catch (error) {
-        res.status(500).json({
+        console.error("Update script exception:", error.message);
+
+        return res.status(500).json({
             success: false,
             error: "Internal server error"
         });
     }
 });
 
-// ================================
-// DELETE SCRIPT
-// DELETE /api/scripts/:script_id
-// ================================
-
+// ลบสคริปต์
 app.delete("/api/scripts/:script_id", authorizeBot, async (req, res) => {
     if (!supabase) {
         return res.status(503).json({
@@ -380,6 +343,8 @@ app.delete("/api/scripts/:script_id", authorizeBot, async (req, res) => {
             .select("script_id");
 
         if (error) {
+            console.error("Delete script failed:", error.message);
+
             return res.status(500).json({
                 success: false,
                 error: "Failed to delete script"
@@ -393,22 +358,21 @@ app.delete("/api/scripts/:script_id", authorizeBot, async (req, res) => {
             });
         }
 
-        res.json({
+        return res.json({
             success: true,
             deleted: req.params.script_id
         });
     } catch (error) {
-        res.status(500).json({
+        console.error("Delete script exception:", error.message);
+
+        return res.status(500).json({
             success: false,
             error: "Internal server error"
         });
     }
 });
 
-// ================================
-// START SERVER
-// ================================
-
+// เริ่ม API
 app.listen(PORT, "0.0.0.0", () => {
     console.log("Zero Hub API started on port " + PORT);
 });
