@@ -2,96 +2,39 @@ const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
-
 const PORT = process.env.PORT || 3000;
+
+// ==========================================
+// CONFIG
+// ==========================================
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY =
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-let supabase = null;
-
-if (SUPABASE_URL && SUPABASE_KEY) {
-    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !BOT_TOKEN) {
+    throw new Error(
+        "Missing environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BOT_TOKEN"
+    );
 }
 
-// หน้าแรก
-app.get("/", (req, res) => {
-    res.status(403).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Zero Hub</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-        </head>
-        <body style="background:#0a0a0a;color:#ff3333;text-align:center;font-family:Arial;padding-top:100px">
-            <h1>Zero Hub</h1>
-            <h2>Access Denied</h2>
-        </body>
-        </html>
-    `);
-});
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY
+);
 
-// ตรวจสอบสถานะ API
-app.get("/api/status", (req, res) => {
-    res.json({
-        success: true,
-        name: "Zero Hub API",
-        status: "Online"
-    });
-});
+app.use(express.json({ limit: "2mb" }));
 
-// ตรวจสอบการเชื่อมต่อฐานข้อมูล
-app.get("/api/db-status", async (req, res) => {
-    if (!supabase) {
-        return res.status(503).json({
-            success: false,
-            database: "Not configured"
-        });
-    }
+// ==========================================
+// HELPERS
+// ==========================================
 
-    try {
-        const { error } = await supabase
-            .from("scripts")
-            .select("id")
-            .limit(1);
+function requireBotToken(req, res, next) {
+    const auth = req.headers.authorization || "";
+    const expected = `Bearer ${BOT_TOKEN}`;
 
-        if (error) {
-            console.error("Database check failed:", error.message);
-
-            return res.status(500).json({
-                success: false,
-                database: "Error",
-                message: error.message,
-                code: error.code
-            });
-        }
-
-        return res.json({
-            success: true,
-            database: "Connected",
-            table: "scripts"
-        });
-    } catch (error) {
-        console.error("Database check exception:", error.message);
-
-        return res.status(500).json({
-            success: false,
-            database: "Error"
-        });
-    }
-});
-
-// ตรวจสอบ Token ของ Discord Bot
-function authorizeBot(req, res, next) {
-    if (!BOT_TOKEN) {
-        return res.status(503).json({
-            success: false,
-            error: "Bot authentication is not configured"
-        });
-    }
-
-    if (req.headers.authorization !== `Bearer ${BOT_TOKEN}`) {
+    if (auth !== expected) {
         return res.status(401).json({
             success: false,
             error: "Unauthorized"
@@ -101,278 +44,395 @@ function authorizeBot(req, res, next) {
     next();
 }
 
-// ดึงเนื้อหาสคริปต์ด้วย Script ID
+function validScriptId(scriptId) {
+    return (
+        typeof scriptId === "string" &&
+        /^[a-zA-Z0-9_-]{1,100}$/.test(scriptId)
+    );
+}
+
+function validScriptContent(content) {
+    return (
+        typeof content === "string" &&
+        content.trim().length > 0 &&
+        Buffer.byteLength(content, "utf8") <= 1_000_000
+    );
+}
+
+// ==========================================
+// HOME
+// ==========================================
+
+app.get("/", (req, res) => {
+    res.status(200).type("text/plain").send(
+        "Zero Hub API is running"
+    );
+});
+
+// ==========================================
+// STATUS
+// ==========================================
+
+app.get("/api/status", (req, res) => {
+    res.json({
+        success: true,
+        service: "Zero Hub API",
+        status: "online"
+    });
+});
+
+// ==========================================
+// DATABASE STATUS
+// ==========================================
+
+app.get("/api/db-status", async (req, res) => {
+    try {
+        const { error } = await supabase
+            .from("scripts")
+            .select("id")
+            .limit(1);
+
+        if (error) {
+            return res.status(500).json({
+                success: false,
+                database: "Error",
+                error: error.message
+            });
+        }
+
+        res.json({
+            success: true,
+            database: "Connected",
+            table: "scripts"
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            database: "Error"
+        });
+    }
+});
+
+// ==========================================
+// PUBLIC SCRIPT ROUTE
+// ส่งโค้ด Lua ดิบ ๆ สำหรับ Loadstring
+// ==========================================
+
 app.get("/api/script/:script_id", async (req, res) => {
-    if (!supabase) {
-        return res.status(503)
+    const { script_id } = req.params;
+
+    if (!validScriptId(script_id)) {
+        return res.status(400)
             .type("text/plain")
-            .send("-- Zero Hub API is not configured");
+            .send("-- Invalid script ID");
     }
 
     try {
         const { data, error } = await supabase
             .from("scripts")
             .select("content")
-            .eq("script_id", req.params.script_id)
-            .maybeSingle();
+            .eq("script_id", script_id)
+            .single();
 
-        if (error) {
-            console.error("Get script failed:", error.message);
-
-            return res.status(500)
-                .type("text/plain")
-                .send("-- Failed to retrieve script");
-        }
-
-        if (!data) {
+        if (error || !data) {
             return res.status(404)
                 .type("text/plain")
                 .send("-- Script not found");
         }
 
-        return res.type("text/plain").send(data.content);
-    } catch (error) {
-        console.error("Get script exception:", error.message);
+        res.set("Cache-Control", "no-store");
+        res.type("text/plain").send(data.content);
 
-        return res.status(500)
+    } catch (error) {
+        console.error("Script fetch error:", error.message);
+
+        res.status(500)
             .type("text/plain")
             .send("-- Internal server error");
     }
 });
 
-// เพิ่มสคริปต์
-app.post("/api/scripts", authorizeBot, async (req, res) => {
-    if (!supabase) {
-        return res.status(503).json({
-            success: false,
-            error: "Database is not configured"
-        });
-    }
+// ==========================================
+// ADD SCRIPT
+// ==========================================
 
-    const { name, script_id, content } = req.body;
+app.post(
+    "/api/scripts",
+    requireBotToken,
+    async (req, res) => {
+        const { name, script_id, content } = req.body || {};
 
-    if (
-        typeof name !== "string" ||
-        !name.trim() ||
-        typeof script_id !== "string" ||
-        !/^[a-zA-Z0-9_-]{1,100}$/.test(script_id) ||
-        typeof content !== "string" ||
-        !content.trim()
-    ) {
-        return res.status(400).json({
-            success: false,
-            error: "Invalid name, script_id or content"
-        });
-    }
-
-    try {
-        const { data, error } = await supabase
-            .from("scripts")
-            .insert({
-                name: name.trim(),
-                script_id,
-                content,
-                version: 1
-            })
-            .select("id, name, script_id, version")
-            .single();
-
-        if (error) {
-            console.error("Add script failed:", error.message);
-
+        if (
+            typeof name !== "string" ||
+            !name.trim() ||
+            name.length > 100
+        ) {
             return res.status(400).json({
                 success: false,
-                error: error.code === "23505"
-                    ? "script_id already exists"
-                    : "Failed to add script"
+                error: "Invalid script name"
             });
         }
 
-        return res.status(201).json({
-            success: true,
-            script: data
-        });
-    } catch (error) {
-        console.error("Add script exception:", error.message);
+        if (!validScriptId(script_id)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid script_id"
+            });
+        }
 
-        return res.status(500).json({
-            success: false,
-            error: "Internal server error"
-        });
+        if (!validScriptContent(content)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid or empty script content"
+            });
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from("scripts")
+                .insert({
+                    name: name.trim(),
+                    script_id,
+                    content,
+                    version: 1
+                })
+                .select()
+                .single();
+
+            if (error) {
+                if (error.code === "23505") {
+                    return res.status(409).json({
+                        success: false,
+                        error: "Script ID already exists"
+                    });
+                }
+
+                throw error;
+            }
+
+            res.status(201).json({
+                success: true,
+                script: data,
+                loadstring:
+                    `loadstring(game:HttpGet("${process.env.PUBLIC_API_URL || "https://zero-hub-api.onrender.com"}/api/script/${script_id}"))()`
+            });
+
+        } catch (error) {
+            console.error("Add script error:", error.message);
+
+            res.status(500).json({
+                success: false,
+                error: "Failed to add script"
+            });
+        }
     }
-});
+);
 
-// แสดงรายการสคริปต์
-app.get("/api/scripts", authorizeBot, async (req, res) => {
-    if (!supabase) {
-        return res.status(503).json({
-            success: false,
-            error: "Database is not configured"
-        });
-    }
+// ==========================================
+// LIST SCRIPTS
+// ==========================================
 
-    try {
-        const { data, error } = await supabase
-            .from("scripts")
-            .select("name, script_id, version, created_at, updated_at")
-            .order("created_at", { ascending: false });
+app.get(
+    "/api/scripts",
+    requireBotToken,
+    async (req, res) => {
+        try {
+            const { data, error } = await supabase
+                .from("scripts")
+                .select(
+                    "id, name, script_id, version, created_at, updated_at"
+                )
+                .order("created_at", { ascending: false });
 
-        if (error) {
-            console.error("List scripts failed:", error.message);
+            if (error) {
+                throw error;
+            }
 
-            return res.status(500).json({
+            res.json({
+                success: true,
+                scripts: data || []
+            });
+
+        } catch (error) {
+            console.error("List scripts error:", error.message);
+
+            res.status(500).json({
                 success: false,
                 error: "Failed to list scripts"
             });
         }
-
-        return res.json({
-            success: true,
-            scripts: data
-        });
-    } catch (error) {
-        console.error("List scripts exception:", error.message);
-
-        return res.status(500).json({
-            success: false,
-            error: "Internal server error"
-        });
     }
-});
+);
 
-// แก้ไขสคริปต์
-app.put("/api/scripts/:script_id", authorizeBot, async (req, res) => {
-    if (!supabase) {
-        return res.status(503).json({
-            success: false,
-            error: "Database is not configured"
-        });
-    }
+// ==========================================
+// UPDATE SCRIPT
+// ==========================================
 
-    const { name, content } = req.body;
-    const updates = {};
+app.put(
+    "/api/scripts/:script_id",
+    requireBotToken,
+    async (req, res) => {
+        const { script_id } = req.params;
+        const { content, name } = req.body || {};
 
-    if (typeof name === "string" && name.trim()) {
-        updates.name = name.trim();
-    }
-
-    if (typeof content === "string" && content.trim()) {
-        updates.content = content;
-    }
-
-    if (Object.keys(updates).length === 0) {
-        return res.status(400).json({
-            success: false,
-            error: "Provide a valid name or content"
-        });
-    }
-
-    try {
-        const { data: oldScript, error: findError } = await supabase
-            .from("scripts")
-            .select("version")
-            .eq("script_id", req.params.script_id)
-            .maybeSingle();
-
-        if (findError) {
-            console.error("Find script failed:", findError.message);
-
-            return res.status(500).json({
+        if (!validScriptId(script_id)) {
+            return res.status(400).json({
                 success: false,
-                error: "Failed to find script"
+                error: "Invalid script ID"
             });
         }
 
-        if (!oldScript) {
-            return res.status(404).json({
+        const updates = {};
+
+        if (content !== undefined) {
+            if (!validScriptContent(content)) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid or empty script content"
+                });
+            }
+
+            updates.content = content;
+        }
+
+        if (name !== undefined) {
+            if (
+                typeof name !== "string" ||
+                !name.trim() ||
+                name.length > 100
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid script name"
+                });
+            }
+
+            updates.name = name.trim();
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({
                 success: false,
-                error: "Script not found"
+                error: "Nothing to update"
             });
         }
 
-        if (typeof content === "string" && content.trim()) {
-            updates.version = oldScript.version + 1;
-        }
+        try {
+            const { data: existing, error: findError } =
+                await supabase
+                    .from("scripts")
+                    .select("content, version")
+                    .eq("script_id", script_id)
+                    .single();
 
-        updates.updated_at = new Date().toISOString();
+            if (findError || !existing) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Script not found"
+                });
+            }
 
-        const { data, error } = await supabase
-            .from("scripts")
-            .update(updates)
-            .eq("script_id", req.params.script_id)
-            .select("name, script_id, version, updated_at")
-            .single();
+            if (
+                updates.content !== undefined &&
+                updates.content !== existing.content
+            ) {
+                updates.version = (existing.version || 1) + 1;
+            }
 
-        if (error) {
-            console.error("Update script failed:", error.message);
+            updates.updated_at = new Date().toISOString();
 
-            return res.status(500).json({
+            const { data, error } = await supabase
+                .from("scripts")
+                .update(updates)
+                .eq("script_id", script_id)
+                .select()
+                .single();
+
+            if (error) {
+                throw error;
+            }
+
+            res.json({
+                success: true,
+                script: data,
+                loadstring:
+                    `loadstring(game:HttpGet("${process.env.PUBLIC_API_URL || "https://zero-hub-api.onrender.com"}/api/script/${script_id}"))()`
+            });
+
+        } catch (error) {
+            console.error("Update script error:", error.message);
+
+            res.status(500).json({
                 success: false,
                 error: "Failed to update script"
             });
         }
-
-        return res.json({
-            success: true,
-            script: data
-        });
-    } catch (error) {
-        console.error("Update script exception:", error.message);
-
-        return res.status(500).json({
-            success: false,
-            error: "Internal server error"
-        });
     }
-});
+);
 
-// ลบสคริปต์
-app.delete("/api/scripts/:script_id", authorizeBot, async (req, res) => {
-    if (!supabase) {
-        return res.status(503).json({
-            success: false,
-            error: "Database is not configured"
-        });
-    }
+// ==========================================
+// DELETE SCRIPT
+// ==========================================
 
-    try {
-        const { data, error } = await supabase
-            .from("scripts")
-            .delete()
-            .eq("script_id", req.params.script_id)
-            .select("script_id");
+app.delete(
+    "/api/scripts/:script_id",
+    requireBotToken,
+    async (req, res) => {
+        const { script_id } = req.params;
 
-        if (error) {
-            console.error("Delete script failed:", error.message);
+        if (!validScriptId(script_id)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid script ID"
+            });
+        }
 
-            return res.status(500).json({
+        try {
+            const { data, error } = await supabase
+                .from("scripts")
+                .delete()
+                .eq("script_id", script_id)
+                .select("script_id")
+                .single();
+
+            if (error || !data) {
+                return res.status(404).json({
+                    success: false,
+                    error: "Script not found"
+                });
+            }
+
+            res.json({
+                success: true,
+                deleted: data.script_id
+            });
+
+        } catch (error) {
+            console.error("Delete script error:", error.message);
+
+            res.status(500).json({
                 success: false,
                 error: "Failed to delete script"
             });
         }
-
-        if (!data || data.length === 0) {
-            return res.status(404).json({
-                success: false,
-                error: "Script not found"
-            });
-        }
-
-        return res.json({
-            success: true,
-            deleted: req.params.script_id
-        });
-    } catch (error) {
-        console.error("Delete script exception:", error.message);
-
-        return res.status(500).json({
-            success: false,
-            error: "Internal server error"
-        });
     }
+);
+
+// ==========================================
+// 404
+// ==========================================
+
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        error: "Route not found"
+    });
 });
 
-// เริ่ม API
-app.listen(PORT, "0.0.0.0", () => {
-    console.log("Zero Hub API started on port " + PORT);
+// ==========================================
+// START SERVER
+// ==========================================
+
+app.listen(PORT, () => {
+    console.log(`Zero Hub API listening on port ${PORT}`);
 });
